@@ -14,12 +14,37 @@
       #messages > li { padding: 0.5rem 1rem; }
       #messages > li:nth-child(odd) { background: #efefef; }
     </style>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.bundle.min.js" integrity="sha384-pprn3073KE6tl6bjs2QrFaJGz5/SUsLqktiwsUTF55Jfv3qYSDhgCecCxMW52nD2" crossorigin="anonymous"></script>
   </head>
   <body>
-    <ul id="messages"></ul>
-    <form id="form" action="">
-      <input id="input" autocomplete="off" /><button>Send</button>
-    </form>
+
+    <div class="container mt-5">
+      <div class="row">
+          <div class="col-8">
+            <div id="alert"></div>
+            <ul id="messages"></ul>
+            <p id="status" style="font-size: 12px; padding: 5px 5px;"></p>
+            <form id="form" action="">
+              <input id="input" autocomplete="off" /><button>Send</button>
+            </form>
+          </div>
+          <div class="col-4">
+            <p>Add username</p>
+            <div class="form-floating mb-3">
+              <input type="text" class="form-control" id="usernameInput" placeholder="Andrew">
+              <label for="floatingInput">Username</label>
+              <button id="btnUsername" class="btn btn-primary mt-1"> Send </button>
+            </div>
+            <br>
+            <hr/>
+            <p>Active Users <span class="badge bg-success rounded-pill"> </span></p>
+            <ul class="list-group" id="list-actives">
+            </ul>
+          </div>
+      </div>
+    </div>
+    
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
@@ -28,21 +53,119 @@
       var messages = document.getElementById('messages');
       var form = document.getElementById('form');
       var input = document.getElementById('input');
+      var statusContainer = document.getElementById('status');
+      var inputUsername = document.getElementById('usernameInput');
+      var buttonSetUsername = document.getElementById('btnUsername');
+      var listActivesUsers = document.getElementById('list-actives');
+      var divAlert = document.getElementById('alert');
+
+      buttonSetUsername.addEventListener('click', function(e) {
+        if(inputUsername.value){
+          socket.emit("set username", inputUsername.value);
+        }
+      })
 
       form.addEventListener('submit', function(e) {
         e.preventDefault();
         if (input.value) {
-          socket.emit('chat message', input.value);
+
+          var card = document.createElement('div');
+          card.setAttribute('class', 'card text-bg-primary mb-1');
+
+          var cardBody = document.createElement('div');
+          cardBody.setAttribute('class', 'card-body');
+
+          var text = document.createElement('p');
+          text.setAttribute('class', 'card-text');
+          text.setAttribute("style", "text-align: right;");
+          text.textContent = input.value;
+
+          card.appendChild(cardBody);
+          cardBody.appendChild(text);
+          messages.appendChild(card);
+          // var item = document.createElement('li');
+          // item.textContent = input.value;
+          // item.setAttribute("style", "background-color: #0084ff; color: white; text-align: right")
+          // messages.appendChild(item);
+          window.scrollTo(0, document.body.scrollHeight);
+          socket.emit('chat message', socket.id, input.value);
           input.value = '';
         }
       });
 
-      socket.on('chat message', function(msg) {
-        var item = document.createElement('li');
-        item.textContent = msg;
-        messages.appendChild(item);
+      input.addEventListener('keypress', function(e) {
+        socket.emit('statusPress', socket.id, " esta escribiendo...");
+      })
+
+      input.addEventListener('keyup', function(e) {
+        socket.emit('statusUp', socket.id, "");
+      })
+
+      socket.on('statusPress', function(msg){
+        statusContainer.textContent = msg;
+      })
+
+      socket.on('users active', function({actives}){
+        // vaciamos la lista
+        while(listActivesUsers.firstChild){
+          listActivesUsers.removeChild(listActivesUsers.firstChild);
+        }
+
+        // llenamos la lista
+        var item;
+        for(let i=0; i<actives.length; i++){
+          item = document.createElement('li');
+          item.textContent = actives[i] ? actives[i] : "Anonymous";
+          item.setAttribute("class", "list-group-item");
+          listActivesUsers.appendChild(item);
+        }
+      })
+
+      socket.on('statusUp', function(msg){
+
+        setTimeout(() => {          
+          statusContainer.textContent = msg;
+        }, 1500);
+      })
+
+      socket.on("alert disconnect", function({user, msg}){
+        var alert = document.createElement('div');
+        alert.setAttribute('class', 'alert alert-danger');
+        alert.setAttribute('role', 'alert');
+        alert.textContent = user ? user + " " + msg : "¡Anonymous"+msg;
+        divAlert.appendChild(alert);
+        setTimeout(() => {
+          divAlert.removeChild(divAlert.firstChild);
+        }, 3000);
+      })
+
+      socket.on('chat message', function({user,msg}) {
+        // console.log(socket.id);
+        var card = document.createElement('div');
+        card.setAttribute('class', 'card mb-1');
+
+        var cardBody = document.createElement('div');
+        cardBody.setAttribute('class', 'card-body');
+
+        var subtitulo = document.createElement('h6');
+        subtitulo.setAttribute('class', 'card-subtitle mb-2 text-muted');
+        subtitulo.setAttribute('style', "font-weight: bold; color: black; font-size: 10px");
+        subtitulo.textContent = user ? user : "Anonymous";
+
+        var text = document.createElement('p');
+        text.setAttribute('class', 'card-text');
+        text.textContent = msg;
+
+        cardBody.appendChild(subtitulo);
+        cardBody.appendChild(text);
+        card.appendChild(cardBody);
+        messages.appendChild(card);
+        // var item = document.createElement('li');
+        // item.textContent = msg + "    " + user;
+        // messages.appendChild(item);
         window.scrollTo(0, document.body.scrollHeight);
       });
+
     </script>
   </body>
 </html>
